@@ -1,9 +1,18 @@
-from builtins import range
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Tuple
+
 import numpy as np
 
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Optional, Tuple
 
 
-def affine_forward(x, w, b):
+def affine_forward(
+    x: np.ndarray,
+    w: np.ndarray,
+    b: np.ndarray,
+) -> Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
     Computes the forward pass for an affine (fully-connected) layer.
 
@@ -21,14 +30,13 @@ def affine_forward(x, w, b):
     - out: output, of shape (N, M)
     - cache: (x, w, b)
     """
-    out = None
     ###########################################################################
     # TODO: Implement the affine forward pass. Store the result in out. You   #
     # will need to reshape the input into rows.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    out = x.reshape(x.shape[0], -1).dot(w) + b
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -38,7 +46,10 @@ def affine_forward(x, w, b):
     return out, cache
 
 
-def affine_backward(dout, cache):
+def affine_backward(
+    dout: np.ndarray,
+    cache: Tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the backward pass for an affine layer.
 
@@ -55,13 +66,14 @@ def affine_backward(dout, cache):
     - db: Gradient with respect to b, of shape (M,)
     """
     x, w, b = cache
-    dx, dw, db = None, None, None
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dx = dout.dot(w.T).reshape(x.shape)
+    dw = x.reshape(x.shape[0], -1).T.dot(dout)
+    db = np.sum(dout, axis=0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -70,7 +82,7 @@ def affine_backward(dout, cache):
     return dx, dw, db
 
 
-def relu_forward(x):
+def relu_forward(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Computes the forward pass for a layer of rectified linear units (ReLUs).
 
@@ -87,7 +99,7 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    out = np.maximum(x, 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -97,7 +109,7 @@ def relu_forward(x):
     return out, cache
 
 
-def relu_backward(dout, cache):
+def relu_backward(dout: Any, cache: np.ndarray) -> np.ndarray:
     """
     Computes the backward pass for a layer of rectified linear units (ReLUs).
 
@@ -114,7 +126,8 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    mask = x > 0
+    dx = dout * mask
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -123,7 +136,12 @@ def relu_backward(dout, cache):
     return dx
 
 
-def batchnorm_forward(x, gamma, beta, bn_param):
+def batchnorm_forward(
+    x: np.ndarray,
+    gamma: np.ndarray,
+    beta: np.ndarray,
+    bn_param: Dict[str, Any],
+) -> Tuple[np.ndarray, tuple]:
     """
     Forward pass for batch normalization.
 
@@ -194,7 +212,22 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        mu = np.mean(x, axis=0)
+
+        xmu = x - mu
+        sq = xmu ** 2
+        var = np.var(x, axis=0)
+
+        sqrtvar = np.sqrt(var + eps)
+        ivar = 1. / sqrtvar
+        xhat = xmu * ivar
+
+        out = gamma * xhat + beta
+
+        cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps)
+
+        running_mean = momentum * running_mean + (1 - momentum) * mu
+        running_var = momentum * running_var + (1 - momentum) * var
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -209,7 +242,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        x_normalize = (x - running_mean) / np.sqrt(running_var + eps)
+        out = gamma * x_normalize + beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -225,7 +259,7 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     return out, cache
 
 
-def batchnorm_backward(dout, cache):
+def batchnorm_backward(dout: np.ndarray, cache: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Backward pass for batch normalization.
 
@@ -251,7 +285,30 @@ def batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, D = dout.shape
+
+    xhat, gamma, xmu, ivar, sqrtvar, var, eps = cache
+
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout * xhat, axis=0)
+    dxhat = dout * gamma
+
+    divar = np.sum(dxhat * xmu, axis=0)
+    dxmu1 = dxhat * ivar
+
+    dsqrtvar = -1. / (sqrtvar ** 2) * divar
+    dvar = 0.5 * 1. / np.sqrt(var + eps) * dsqrtvar
+
+    dsq = 1. / N * np.ones((N, D)) * dvar
+    dxmu2 = 2 * xmu * dsq
+
+    dx1 = dxmu1 + dxmu2
+
+    dmu = -1 * np.sum(dx1, axis=0)
+
+    dx2 = 1. / N * np.ones((N, D)) * dmu
+
+    dx = dx1 + dx2
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -261,15 +318,121 @@ def batchnorm_backward(dout, cache):
     return dx, dgamma, dbeta
 
 
+def layernorm_forward(
+    x: np.ndarray,
+    gamma: np.ndarray,
+    beta: np.ndarray,
+    ln_param: Dict[str, Any],
+) -> Tuple[np.ndarray, tuple]:
+    """
+    Forward pass for layer normalization.
+    During both training and test-time, the incoming data is normalized per data-point,
+    before being scaled by gamma and beta parameters identical to that of batch normalization.
+
+    Note that in contrast to batch normalization, the behavior during train and test-time for
+    layer normalization are identical, and we do not need to keep track of running averages
+    of any sort.
+    Input:
+    - x: Data of shape (N, D)
+    - gamma: Scale parameter of shape (D,)
+    - beta: Shift paremeter of shape (D,)
+    - ln_param: Dictionary with the following keys:
+        - eps: Constant for numeric stability
+    Returns a tuple of:
+    - out: of shape (N, D)
+    - cache: A tuple of values needed in the backward pass
+    """
+    eps = ln_param.get('eps', 1e-5)
+    ###########################################################################
+    # TODO: Implement the training-time forward pass for layer norm.          #
+    # Normalize the incoming data, and scale and  shift the normalized data   #
+    #  using gamma and beta.                                                  #
+    # HINT: this can be done by slightly modifying your training-time         #
+    # implementation of  batch normalization, and inserting a line or two of  #
+    # well-placed code. In particular, can you think of any matrix            #
+    # transformations you could perform, that would enable you to copy over   #
+    # the batch norm code and leave it almost unchanged?                      #
+    ###########################################################################
+
+    # Tranpose x to use bath normalization code, now x is of shape (D, N)
+    x = x.T
+
+    # Just copy from batch normalization cdoe
+    mu = np.mean(x, axis=0)
+
+    xmu = x - mu
+    sq = xmu ** 2
+    var = np.var(x, axis=0)
+
+    sqrtvar = np.sqrt(var + eps)
+    ivar = 1. / sqrtvar
+    xhat = xmu * ivar
+
+    # Transpose back, now shape of xhat (N, D)
+    xhat = xhat.T
+
+    # Just copy from batch normalization cdoe
+    out = gamma * xhat + beta
+
+    cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps)
+
+    ###########################################################################
+    #                             END OF YOUR CODE                            #
+    ###########################################################################
+    return out, cache
 
 
+def layernorm_backward(dout: np.ndarray, cache: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Backward pass for layer normalization.
+    For this implementation, you can heavily rely on the work you've done already
+    for batch normalization.
+    Inputs:
+    - dout: Upstream derivatives, of shape (N, D)
+    - cache: Variable of intermediates from layernorm_forward.
+    Returns a tuple of:
+    - dx: Gradient with respect to inputs x, of shape (N, D)
+    - dgamma: Gradient with respect to scale parameter gamma, of shape (D,)
+    - dbeta: Gradient with respect to shift parameter beta, of shape (D,)
+    """
+    dx, dgamma, dbeta = None, None, None
+    ###########################################################################
+    # TODO: Implement the backward pass for layer norm.                       #
+    #                                                                         #
+    # HINT: this can be done by slightly modifying your training-time         #
+    # implementation of batch normalization. The hints to the forward pass    #
+    # still apply!                                                            #
+    ###########################################################################
+
+    # Just copy code from batch normalization backward
+    xhat, gamma, xmu, ivar, sqrtvar, var, eps = cache
+
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(xhat * dout, axis=0)
+
+    dxhat = dout * gamma
+
+    # Transpose dxhat and xhat back
+    dxhat = dxhat.T
+    xhat = xhat.T
+
+    # Actually xhat's shape is (D, N), we use notation (N, D) to let us copy
+    # batch normalization backward code when computing dx without change anything
+    N, D = xhat.shape
+
+    # Copy from batch normalization backward code
+    dx = 1.0 / N * ivar * (N * dxhat - np.sum(dxhat, axis=0) - xhat * np.sum(dxhat * xhat, axis=0))
+
+    # Transpose dx back
+    dx = dx.T
+
+    ###########################################################################
+    #                             END OF YOUR CODE                            #
+    ###########################################################################
+    return dx, dgamma, dbeta
 
 
-
-
-
-
-def dropout_forward(x, dropout_param):
+def dropout_forward(x: np.ndarray, dropout_param: Dict[str, Any]) -> Tuple[np.ndarray, tuple]:
     """
     Performs the forward pass for (inverted) dropout.
 
@@ -334,7 +497,7 @@ def dropout_forward(x, dropout_param):
     return out, cache
 
 
-def dropout_backward(dout, cache):
+def dropout_backward(dout: np.ndarray, cache: tuple) -> np.ndarray:
     """
     Perform the backward pass for (inverted) dropout.
 
@@ -363,7 +526,12 @@ def dropout_backward(dout, cache):
     return dx
 
 
-def conv_forward_naive(x, w, b, conv_param):
+def conv_forward_naive(
+    x: np.ndarray,
+    w: np.ndarray,
+    b: np.ndarray,
+    conv_param: Dict[str, int],
+) -> Tuple[np.ndarray, tuple]:
     """
     A naive implementation of the forward pass for a convolutional layer.
 
@@ -408,7 +576,7 @@ def conv_forward_naive(x, w, b, conv_param):
     return out, cache
 
 
-def conv_backward_naive(dout, cache):
+def conv_backward_naive(dout: np.ndarray, cache: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     A naive implementation of the backward pass for a convolutional layer.
 
@@ -436,7 +604,7 @@ def conv_backward_naive(dout, cache):
     return dx, dw, db
 
 
-def max_pool_forward_naive(x, pool_param):
+def max_pool_forward_naive(x: np.ndarray, pool_param: Dict[str, int]) -> Tuple[np.ndarray, tuple]:
     """
     A naive implementation of the forward pass for a max-pooling layer.
 
@@ -471,7 +639,7 @@ def max_pool_forward_naive(x, pool_param):
     return out, cache
 
 
-def max_pool_backward_naive(dout, cache):
+def max_pool_backward_naive(dout: np.ndarray, cache: tuple) -> np.ndarray:
     """
     A naive implementation of the backward pass for a max-pooling layer.
 
@@ -497,7 +665,12 @@ def max_pool_backward_naive(dout, cache):
     return dx
 
 
-def spatial_batchnorm_forward(x, gamma, beta, bn_param):
+def spatial_batchnorm_forward(
+    x: np.ndarray,
+    gamma: np.ndarray,
+    beta: np.ndarray,
+    bn_param: Dict[str, Any],
+) -> Tuple[np.ndarray, tuple]:
     """
     Computes the forward pass for spatial batch normalization.
 
@@ -540,7 +713,7 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     return out, cache
 
 
-def spatial_batchnorm_backward(dout, cache):
+def spatial_batchnorm_backward(dout: np.ndarray, cache: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the backward pass for spatial batch normalization.
 
@@ -574,7 +747,13 @@ def spatial_batchnorm_backward(dout, cache):
     return dx, dgamma, dbeta
 
 
-def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
+def spatial_groupnorm_forward(
+    x: np.ndarray,
+    gamma: np.ndarray,
+    beta: np.ndarray,
+    G: np.ndarray,
+    gn_param: Dict[str, Any],
+) -> Tuple[np.ndarray, tuple]:
     """
     Computes the forward pass for spatial group normalization.
     In contrast to layer normalization, group normalization splits each entry 
@@ -613,7 +792,7 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     return out, cache
 
 
-def spatial_groupnorm_backward(dout, cache):
+def spatial_groupnorm_backward(dout: np.ndarray, cache: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the backward pass for spatial group normalization.
 
@@ -643,7 +822,7 @@ def spatial_groupnorm_backward(dout, cache):
     return dx, dgamma, dbeta
 
 
-def svm_loss(x, y):
+def svm_loss(x: np.ndarray, y: np.ndarray) -> Tuple[float, np.ndarray]:
     """
     Computes the loss and gradient using for multiclass SVM classification.
 
@@ -670,7 +849,7 @@ def svm_loss(x, y):
     return loss, dx
 
 
-def softmax_loss(x, y):
+def softmax_loss(x: np.ndarray, y: np.ndarray) -> Tuple[float, np.ndarray]:
     """
     Computes the loss and gradient for softmax classification.
 
